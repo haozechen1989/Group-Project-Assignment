@@ -95,7 +95,7 @@
     .schedule { padding: clamp(20px, 3vw, 30px); }
     .schedule-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
     .schedule-head p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
-    .days-grid { display: grid; height: calc(100% - 50px); min-height: 325px; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .days-grid { display: grid; min-height: 325px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); align-content: start; gap: 12px; }
     .day-column { display: flex; min-width: 0; flex-direction: column; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
     .day-title { padding: 13px 14px 12px; background: var(--green); color: white; }
     .day-column:nth-child(2) .day-title { background: var(--coral); }
@@ -107,6 +107,7 @@
     .order { display: grid; width: 23px; height: 23px; flex: 0 0 auto; place-items: center; background: var(--yellow); border-radius: 50%; color: var(--ink); font-size: 11px; font-weight: 950; font-variant-numeric: tabular-nums; }
     @keyframes arrive { from { opacity: 0; transform: translate(22px, -13px) scale(.92); } to { opacity: 1; transform: translate(0, 0) scale(1); } }
     .full-note { margin: 0 10px 10px; padding: 7px 8px; background: var(--coral-soft); border-radius: 3px; color: #70291e; font-size: 11px; font-weight: 850; }
+    .schedule-empty { display: grid; min-height: 220px; place-items: center; padding: 24px; color: var(--muted); font-size: 14px; text-align: center; }
     .below-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: 22px; margin-top: 22px; }
     .entry-panel, .sequence-panel { min-width: 0; padding: 21px 24px; background: rgba(255,253,247,.91); border: 1px solid var(--line); border-radius: 7px; }
     .entry-panel p, .sequence-panel p { margin: 6px 0 14px; color: var(--muted); font-size: 13px; line-height: 1.5; }
@@ -159,7 +160,7 @@
   <div class="shell">
     <header class="topbar">
       <div class="brand"><span class="brand-mark" aria-hidden="true">P</span><span>Presentation Draw</span></div>
-      <div class="term-tag">Fall 2026</div>
+      <div class="term-tag">Flexible schedule</div>
     </header>
 
     <main>
@@ -201,21 +202,10 @@
 
         <section class="schedule" aria-labelledby="schedule-heading">
           <div class="schedule-head">
-            <div><h2 id="schedule-heading">Presentation days</h2><p>Groups are ordered by draw.</p></div>
+            <div><h2 id="schedule-heading">Presentation days</h2><p>Groups are ordered by draw and split as evenly as possible.</p></div>
           </div>
-          <div class="days-grid">
-            <section class="day-column" aria-labelledby="thursday-heading">
-              <div class="day-title"><span class="weekday">Thursday</span><h3 id="thursday-heading">November 26</h3></div>
-              <div class="day-meta" id="thursday-meta">0 assigned</div>
-              <ol class="assignment-list" id="thursday-list" aria-label="Thursday presentation order"></ol>
-            </section>
-            <section class="day-column" aria-labelledby="tuesday-heading">
-              <div class="day-title"><span class="weekday">Tuesday</span><h3 id="tuesday-heading">December 1</h3></div>
-              <div class="day-meta" id="tuesday-meta">0 assigned</div>
-              <ol class="assignment-list" id="tuesday-list" aria-label="Tuesday presentation order"></ol>
-              <p class="full-note" id="thursday-full" hidden>Thursday is full. New rolls go to Tuesday.</p>
-            </section>
-          </div>
+          <div class="days-grid" id="days-grid" aria-live="polite"></div>
+          <div class="schedule-empty" id="schedule-empty">Choose the group total and number of presentation days to create the day slots.</div>
         </section>
       </section>
 
@@ -225,6 +215,10 @@
           <p>Enter how many groups are presenting. The draw will create Group 1 through Group N.</p>
           <label for="group-count">Total groups</label>
           <input class="count-input" id="group-count" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 8" required>
+          <label for="day-count" style="margin-top: 14px">Number of presentation days</label>
+          <select class="count-input" id="day-count" disabled>
+            <option value="">Enter the group total first</option>
+          </select>
           <div class="start-row">
             <button class="button button-primary" id="start-button" type="button"><span class="button-icon" aria-hidden="true">▶</span>Start Draw</button>
             <p class="fairness">Each group is randomly selected once and removed from subsequent rolls.</p>
@@ -258,6 +252,7 @@
       const ROLL_DURATION = 2000;
       const nodes = {
         groupInput: document.getElementById("group-count"),
+        dayInput: document.getElementById("day-count"),
         startButton: document.getElementById("start-button"),
         rollButton: document.getElementById("roll-button"),
         undoButton: document.getElementById("undo-button"),
@@ -273,11 +268,8 @@
         drawState: document.getElementById("draw-state"),
         stageBadge: document.getElementById("stage-badge"),
         status: document.getElementById("status-message"),
-        thursdayList: document.getElementById("thursday-list"),
-        tuesdayList: document.getElementById("tuesday-list"),
-        thursdayMeta: document.getElementById("thursday-meta"),
-        tuesdayMeta: document.getElementById("tuesday-meta"),
-        thursdayFull: document.getElementById("thursday-full"),
+        daysGrid: document.getElementById("days-grid"),
+        scheduleEmpty: document.getElementById("schedule-empty"),
         sequenceList: document.getElementById("sequence-list"),
         sequenceEmpty: document.getElementById("sequence-empty"),
         timestamps: document.getElementById("timestamps"),
@@ -289,6 +281,7 @@
         groups: [],
         remaining: [],
         sequence: [],
+        dayCount: null,
         startedAt: null,
         completedAt: null
       };
@@ -314,17 +307,21 @@
           const validSequence = saved.sequence.every((group) => saved.groups.includes(group));
           if (!validGroups || !validSequence || new Set(saved.groups.map((group) => group.toLocaleLowerCase())).size !== saved.groups.length) return;
           const sequence = saved.sequence.filter((group, index, list) => list.indexOf(group) === index);
+          const dayCount = Number.isSafeInteger(saved.dayCount) && saved.dayCount > 0 && saved.dayCount <= saved.groups.length
+            ? saved.dayCount
+            : Math.min(2, saved.groups.length);
           const drawn = new Set(sequence);
           state = {
             groups: saved.groups,
             sequence,
             remaining: saved.groups.filter((group) => !drawn.has(group)),
+            dayCount,
             startedAt: saved.startedAt || null,
             completedAt: sequence.length === saved.groups.length ? (saved.completedAt || null) : null
           };
           nodes.groupInput.value = String(state.groups.length);
         } catch (error) {
-          state = { groups: [], remaining: [], sequence: [], startedAt: null, completedAt: null };
+          state = { groups: [], remaining: [], sequence: [], dayCount: null, startedAt: null, completedAt: null };
         }
       }
 
@@ -338,16 +335,36 @@
         return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
       }
 
-      function dayCapacity() {
-        return Math.ceil(state.groups.length / 2);
+      function getDayAssignments(groupCount, dayCount, sequence) {
+        if (!groupCount || !dayCount) return [];
+        const baseCapacity = Math.floor(groupCount / dayCount);
+        const extraGroups = groupCount % dayCount;
+        let sequenceOffset = 0;
+        return Array.from({ length: dayCount }, (_, index) => {
+          const capacity = baseCapacity + (index < extraGroups ? 1 : 0);
+          const groups = sequence.slice(sequenceOffset, sequenceOffset + capacity);
+          sequenceOffset += capacity;
+          return { index, capacity, groups };
+        });
       }
 
       function getAssignments() {
-        const capacity = dayCapacity();
-        return {
-          thursday: state.sequence.slice(0, capacity),
-          tuesday: state.sequence.slice(capacity)
-        };
+        return getDayAssignments(state.groups.length, state.dayCount, state.sequence);
+      }
+
+      function updateDayChoices(preferredValue = nodes.dayInput.value) {
+        const groupCount = Number(nodes.groupInput.value);
+        const validCount = Number.isSafeInteger(groupCount) && groupCount > 0;
+        const selected = Number(preferredValue);
+        const preserveSelection = validCount && Number.isSafeInteger(selected) && selected > 0 && selected <= groupCount;
+        const options = [new Option(validCount ? "Choose presentation days" : "Enter the group total first", "")];
+        if (validCount) {
+          for (let count = 1; count <= groupCount; count += 1) {
+            options.push(new Option(`${count} day${count === 1 ? "" : "s"}`, String(count)));
+          }
+        }
+        nodes.dayInput.replaceChildren(...options);
+        nodes.dayInput.value = preserveSelection ? String(selected) : "";
       }
 
       function renderList(listNode, groups) {
@@ -368,19 +385,23 @@
         const active = state.groups.length > 0;
         const complete = active && state.sequence.length === state.groups.length;
         const assignments = getAssignments();
-        const capacity = dayCapacity();
-        nodes.totalCount.textContent = String(state.groups.length);
-        nodes.remainingCount.textContent = String(state.remaining.length);
+        const inputGroupCount = Number(nodes.groupInput.value);
+        const previewGroupCount = Number.isSafeInteger(inputGroupCount) && inputGroupCount > 0 ? inputGroupCount : 0;
+        const displayTotal = active ? state.groups.length : previewGroupCount;
+        nodes.totalCount.textContent = String(displayTotal);
+        nodes.remainingCount.textContent = String(active ? state.remaining.length : 0);
         nodes.drawState.textContent = !active ? "Not started" : complete ? "Complete" : "In progress";
         nodes.stageBadge.textContent = rolling ? "Rolling" : complete ? "Complete" : active ? "Your turn" : "Ready";
         nodes.groupInput.disabled = active;
-        nodes.startButton.disabled = active;
+        nodes.dayInput.disabled = active || previewGroupCount === 0;
+        const selectedDayCount = Number(nodes.dayInput.value);
+        nodes.startButton.disabled = active || previewGroupCount === 0 || !Number.isSafeInteger(selectedDayCount) || selectedDayCount < 1 || selectedDayCount > previewGroupCount;
         nodes.rollButton.disabled = !active || complete || rolling;
         nodes.undoButton.disabled = !active || rolling || state.sequence.length === 0;
         nodes.copyButton.disabled = !active || state.sequence.length === 0;
         nodes.downloadButton.disabled = !active || state.sequence.length === 0;
         nodes.die.classList.toggle("is-rolling", rolling);
-        nodes.dieHint.textContent = rolling ? "Choosing from the remaining groups" : complete ? "The draw is complete" : active ? (state.remaining.length ? `${state.remaining.length} group${state.remaining.length === 1 ? "" : "s"} still in the draw` : "No groups remaining") : "Enter your groups to begin";
+        nodes.dieHint.textContent = rolling ? "Choosing from the remaining groups" : complete ? "The draw is complete" : active ? (state.remaining.length ? `${state.remaining.length} group${state.remaining.length === 1 ? "" : "s"} still in the draw` : "No groups remaining") : "Enter your group total to begin";
 
         nodes.remainingGroups.replaceChildren();
         if (state.remaining.length) {
@@ -397,11 +418,37 @@
           nodes.remainingGroups.append(empty);
         }
 
-        renderList(nodes.thursdayList, assignments.thursday);
-        renderList(nodes.tuesdayList, assignments.tuesday);
-        nodes.thursdayMeta.textContent = `${assignments.thursday.length} of ${active ? capacity : 0} assigned`;
-        nodes.tuesdayMeta.textContent = `${assignments.tuesday.length} assigned`;
-        nodes.thursdayFull.hidden = !active || assignments.thursday.length < capacity;
+        const previewDays = active ? assignments : getDayAssignments(previewGroupCount, selectedDayCount, []);
+        const visibleDays = active ? assignments : previewDays;
+        nodes.daysGrid.replaceChildren(...visibleDays.map((day) => {
+          const column = document.createElement("section");
+          column.className = "day-column";
+          column.setAttribute("aria-label", `Presentation Day ${day.index + 1}`);
+          const title = document.createElement("div");
+          title.className = "day-title";
+          const label = document.createElement("span");
+          label.className = "weekday";
+          label.textContent = "Presentation day";
+          const heading = document.createElement("h3");
+          heading.textContent = `Day ${day.index + 1}`;
+          title.append(label, heading);
+          const meta = document.createElement("div");
+          meta.className = "day-meta";
+          meta.textContent = `${day.groups.length} of ${day.capacity} assigned`;
+          const list = document.createElement("ol");
+          list.className = "assignment-list";
+          list.setAttribute("aria-label", `Day ${day.index + 1} presentation order`);
+          renderList(list, day.groups);
+          column.append(title, meta, list);
+          if (active && day.index < assignments.length - 1 && day.groups.length === day.capacity) {
+            const fullNote = document.createElement("p");
+            fullNote.className = "full-note";
+            fullNote.textContent = `Day ${day.index + 1} is full. New groups go to Day ${day.index + 2}.`;
+            column.append(fullNote);
+          }
+          return column;
+        }));
+        nodes.scheduleEmpty.hidden = visibleDays.length > 0;
 
         nodes.sequenceList.replaceChildren(...state.sequence.map((group, index) => {
           const item = document.createElement("li");
@@ -424,7 +471,7 @@
 
         if (!active) {
           nodes.dieLabel.textContent = "Ready to roll";
-          nodes.dieHint.textContent = "Enter your groups to begin";
+          nodes.dieHint.textContent = "Choose your group total and days to begin";
         } else if (!rolling && state.sequence.length === 0) {
           nodes.dieLabel.textContent = "Let’s begin";
         }
@@ -446,8 +493,14 @@
           nodes.groupInput.focus();
           return;
         }
+        const dayCount = Number(nodes.dayInput.value);
+        if (!Number.isSafeInteger(dayCount) || dayCount < 1 || dayCount > groupCount) {
+          setStatus("Choose how many presentation days you need.", true);
+          nodes.dayInput.focus();
+          return;
+        }
         const groups = Array.from({ length: groupCount }, (_, index) => `Group ${index + 1}`);
-        state = { groups, remaining: [...groups], sequence: [], startedAt: new Date().toISOString(), completedAt: null };
+        state = { groups, remaining: [...groups], sequence: [], dayCount, startedAt: new Date().toISOString(), completedAt: null };
         confettiShown = false;
         saveState();
         render();
@@ -527,8 +580,8 @@
           animationFrame = null;
           saveState();
           render();
-          const assignedDay = state.sequence.length <= dayCapacity() ? "Thursday, November 26" : "Tuesday, December 1";
-          setStatus(`${selected} is assigned to ${assignedDay}.`);
+          const assignedDay = getAssignments().find((day) => day.groups.includes(selected));
+          setStatus(`${selected} is assigned to Day ${assignedDay.index + 1}.`);
         }, ROLL_DURATION);
       }
 
@@ -549,12 +602,13 @@
         if (rollTimer !== null) window.clearTimeout(rollTimer);
         if (animationFrame !== null) window.clearTimeout(animationFrame);
         rolling = false;
-        state = { groups: [], remaining: [], sequence: [], startedAt: null, completedAt: null };
+        state = { groups: [], remaining: [], sequence: [], dayCount: null, startedAt: null, completedAt: null };
         confettiShown = false;
         localStorage.removeItem(STORAGE_KEY);
         nodes.groupInput.value = "";
         nodes.dieLabel.textContent = "Ready to roll";
-        setStatus("Draw reset. Enter a new group list when you are ready.");
+        updateDayChoices("");
+        setStatus("Draw reset. Enter a group total when you are ready.");
         render();
         nodes.groupInput.focus();
       }
@@ -565,12 +619,11 @@
           "Presentation Draw",
           `Draw started: ${state.startedAt ? formatDate(state.startedAt) : "Not started"}`,
           `Draw completed: ${state.completedAt ? formatDate(state.completedAt) : "In progress"}`,
-          "",
-          "Thursday, November 26, 2026"
         ];
-        assignments.thursday.forEach((group, index) => lines.push(`${index + 1}. ${group}`));
-        lines.push("", "Tuesday, December 1, 2026");
-        assignments.tuesday.forEach((group, index) => lines.push(`${index + 1}. ${group}`));
+        assignments.forEach((day) => {
+          lines.push("", `Day ${day.index + 1}`);
+          day.groups.forEach((group, index) => lines.push(`${index + 1}. ${group}`));
+        });
         lines.push("", "Overall draw sequence");
         state.sequence.forEach((group, index) => lines.push(`${index + 1}. ${group}`));
         return lines.join("\n");
@@ -604,7 +657,7 @@
         const url = URL.createObjectURL(file);
         const link = document.createElement("a");
         link.href = url;
-        link.download = "bsad-281-presentation-results.txt";
+        link.download = "presentation-draw-results.txt";
         document.body.append(link);
         link.click();
         link.remove();
@@ -628,6 +681,11 @@
       }
 
       nodes.startButton.addEventListener("click", beginDraw);
+      nodes.groupInput.addEventListener("input", () => {
+        updateDayChoices();
+        render();
+      });
+      nodes.dayInput.addEventListener("change", render);
       nodes.rollButton.addEventListener("click", roll);
       nodes.undoButton.addEventListener("click", undoLastRoll);
       nodes.resetButton.addEventListener("click", resetDraw);
@@ -635,6 +693,7 @@
       nodes.downloadButton.addEventListener("click", downloadResults);
 
       loadState();
+      updateDayChoices(state.dayCount);
       render();
       if (state.groups.length) setStatus("Saved draw restored from this browser.");
     })();
