@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f1e8">
+  <title>Presentation Draw</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172d35;
+      --muted: #52666a;
+      --paper: #f4f1e8;
+      --white: #fffdf7;
+      --line: #c7d2ca;
+      --green: #196b55;
+      --green-dark: #10513f;
+      --green-soft: #dcebe1;
+      --coral: #c9513d;
+      --coral-soft: #f5ded5;
+      --yellow: #f3c856;
+      --sky: #dcecf0;
+      --shadow: 0 18px 48px rgba(23, 45, 53, .10);
+      font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background-color: var(--paper);
+      background-image: radial-gradient(rgba(25, 107, 85, .09) .8px, transparent .8px);
+      background-size: 19px 19px;
+      color: var(--ink);
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible {
+      outline: 3px solid #d47a26;
+      outline-offset: 3px;
+    }
+    .shell { max-width: 1440px; margin: auto; padding: 26px clamp(18px, 4vw, 58px) 48px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+    .brand { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    .brand-mark { display: grid; width: 38px; aspect-ratio: 1; place-items: center; background: var(--green); color: white; border-radius: 11px 4px 11px 4px; font-size: 20px; }
+    .term-tag { color: var(--muted); font-size: 13px; font-weight: 700; }
+    .intro { padding: 30px 0 24px; }
+    .eyebrow { margin: 0 0 7px; color: var(--green); font-size: 12px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(32px, 5vw, 57px); line-height: 1.04; letter-spacing: 0; }
+    .intro-copy { margin: 12px 0 0; color: var(--muted); font-size: 16px; }
+    .stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 21px; }
+    .stat { display: flex; align-items: baseline; gap: 8px; padding: 9px 13px; background: rgba(255,253,247,.82); border: 1px solid var(--line); border-radius: 5px; }
+    .stat strong { font-size: 19px; font-variant-numeric: tabular-nums; }
+    .stat span { color: var(--muted); font-size: 12px; font-weight: 750; }
+
+    .main-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: 22px; align-items: stretch; }
+    .stage, .schedule { min-width: 0; background: var(--white); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+    .stage { display: flex; flex-direction: column; padding: clamp(20px, 3vw, 32px); }
+    .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    h2 { margin: 0; font-size: 18px; letter-spacing: 0; }
+    .live-badge { display: inline-flex; align-items: center; gap: 7px; color: var(--green-dark); font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .live-badge::before { width: 8px; height: 8px; border-radius: 50%; background: var(--green); content: ""; }
+    .die-area { position: relative; display: grid; min-height: 255px; margin: 24px 0 17px; place-items: center; overflow: hidden; background: var(--sky); border: 1px solid #bfd4d9; border-radius: 7px; }
+    .die-area::before, .die-area::after { position: absolute; width: 90px; height: 90px; border: 1px solid rgba(25,107,85,.18); border-radius: 50%; content: ""; }
+    .die-area::before { top: -34px; left: -26px; }
+    .die-area::after { right: -24px; bottom: -43px; width: 130px; height: 130px; }
+    .die { position: relative; z-index: 1; display: flex; width: min(78%, 370px); min-height: 158px; flex-direction: column; align-items: center; justify-content: center; padding: 21px; background: var(--white); border: 3px solid var(--ink); border-radius: 17px 9px 17px 9px; box-shadow: 8px 9px 0 var(--green); text-align: center; transition: transform .18s ease, box-shadow .18s ease; }
+    .die-face { display: grid; width: 30px; height: 30px; margin-bottom: 10px; grid-template-columns: repeat(3, 5px); grid-template-rows: repeat(3, 5px); align-content: space-between; justify-content: space-between; }
+    .die-face i { width: 5px; height: 5px; border-radius: 50%; background: var(--coral); }
+    .die-face i:nth-child(2), .die-face i:nth-child(4), .die-face i:nth-child(6), .die-face i:nth-child(8) { visibility: hidden; }
+    .die-label { max-width: 100%; overflow-wrap: anywhere; font-family: Georgia, "Times New Roman", serif; font-size: clamp(22px, 3vw, 36px); font-weight: 700; line-height: 1.08; }
+    .die-hint { margin-top: 9px; color: var(--muted); font-size: 12px; }
+    .die.is-rolling { animation: tumble .19s ease-in-out infinite alternate; }
+    .die.is-rolling .die-face i { background: var(--green); }
+    @keyframes tumble { from { transform: rotate(-2deg) translateY(-2px); box-shadow: 10px 11px 0 var(--green); } to { transform: rotate(2deg) translateY(2px); box-shadow: 6px 7px 0 var(--green); } }
+    .availability { min-height: 54px; margin: 0 0 18px; }
+    .availability-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { max-width: 100%; padding: 5px 9px; overflow-wrap: anywhere; background: var(--green-soft); border-radius: 3px; color: var(--green-dark); font-size: 12px; font-weight: 750; }
+    .empty-note { color: var(--muted); font-size: 13px; }
+    .button-row { display: flex; flex-wrap: wrap; gap: 9px; margin-top: auto; }
+    .button { display: inline-flex; min-height: 45px; align-items: center; justify-content: center; gap: 8px; padding: 10px 15px; border: 1px solid transparent; border-radius: 4px; font-size: 14px; font-weight: 850; transition: background .15s ease, transform .15s ease; }
+    .button:hover:not(:disabled) { transform: translateY(-1px); }
+    .button:disabled { cursor: not-allowed; opacity: .48; }
+    .button-primary { background: var(--green); color: white; }
+    .button-primary:hover:not(:disabled) { background: var(--green-dark); }
+    .button-secondary { border-color: #9caaa2; background: var(--white); color: var(--ink); }
+    .button-secondary:hover:not(:disabled) { background: #edf2eb; }
+    .button-danger { border-color: #d7a399; background: var(--coral-soft); color: #70291e; }
+    .button-danger:hover:not(:disabled) { background: #efd0c5; }
+    .button-icon { font-size: 17px; line-height: 1; }
+    .status { min-height: 24px; margin: 12px 0 0; color: var(--muted); font-size: 13px; }
+    .status[role="alert"] { color: #8d3022; font-weight: 750; }
+
+    .schedule { padding: clamp(20px, 3vw, 30px); }
+    .schedule-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .schedule-head p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+    .days-grid { display: grid; height: calc(100% - 50px); min-height: 325px; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .day-column { display: flex; min-width: 0; flex-direction: column; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+    .day-title { padding: 13px 14px 12px; background: var(--green); color: white; }
+    .day-column:nth-child(2) .day-title { background: var(--coral); }
+    .day-title .weekday { display: block; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; opacity: .9; }
+    .day-title h3 { margin: 3px 0 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(15px, 2vw, 20px); line-height: 1.15; }
+    .day-meta { min-height: 34px; padding: 9px 12px 6px; color: var(--muted); font-size: 11px; font-weight: 800; }
+    .assignment-list { display: flex; flex: 1; flex-direction: column; gap: 7px; margin: 0; padding: 5px 9px 12px; list-style: none; }
+    .assignment { display: flex; min-height: 39px; align-items: center; gap: 9px; padding: 7px 8px; background: #f0f3ed; border-radius: 3px; font-size: 13px; font-weight: 750; overflow-wrap: anywhere; animation: arrive .42s cubic-bezier(.2,.8,.2,1) both; }
+    .order { display: grid; width: 23px; height: 23px; flex: 0 0 auto; place-items: center; background: var(--yellow); border-radius: 50%; color: var(--ink); font-size: 11px; font-weight: 950; font-variant-numeric: tabular-nums; }
+    @keyframes arrive { from { opacity: 0; transform: translate(22px, -13px) scale(.92); } to { opacity: 1; transform: translate(0, 0) scale(1); } }
+    .full-note { margin: 0 10px 10px; padding: 7px 8px; background: var(--coral-soft); border-radius: 3px; color: #70291e; font-size: 11px; font-weight: 850; }
+    .below-grid { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: 22px; margin-top: 22px; }
+    .entry-panel, .sequence-panel { min-width: 0; padding: 21px 24px; background: rgba(255,253,247,.91); border: 1px solid var(--line); border-radius: 7px; }
+    .entry-panel p, .sequence-panel p { margin: 6px 0 14px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 850; }
+    .count-input { display: block; width: 100%; min-height: 52px; padding: 11px 12px; border: 1px solid #98aaa0; border-radius: 4px; background: white; color: var(--ink); font-size: 19px; font-weight: 750; }
+    .count-input:disabled { background: #e8ece6; color: var(--muted); }
+    .start-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+    .fairness { margin: 0 !important; color: var(--green-dark) !important; font-size: 12px !important; font-weight: 750; }
+    .sequence-list { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0; list-style: none; }
+    .sequence-item { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px 7px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--white); font-size: 12px; font-weight: 750; animation: arrive .35s ease both; }
+    .sequence-item .order { width: 21px; height: 21px; }
+    .sequence-empty { color: var(--muted); font-size: 13px; }
+    .timestamps { margin-top: 14px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+    .timestamps strong { color: var(--ink); }
+    .celebration { display: none; margin-top: 14px; padding: 12px 14px; background: #fff0bf; border-left: 4px solid #d49a1f; font-family: Georgia, "Times New Roman", serif; font-size: 18px; font-weight: 700; }
+    .celebration.visible { display: block; animation: arrive .4s ease both; }
+    .confetti { position: fixed; z-index: 5; top: -15px; width: 9px; height: 14px; pointer-events: none; animation: fall 2.5s ease-in forwards; }
+    @keyframes fall { to { transform: translate3d(var(--drift), 105vh, 0) rotate(620deg); opacity: .85; } }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (max-width: 850px) {
+      .main-grid, .below-grid { grid-template-columns: 1fr; }
+      .schedule { order: 2; }
+      .stage { order: 1; }
+      .below-grid { margin-top: 18px; }
+    }
+    @media (max-width: 560px) {
+      .shell { padding: 16px 14px 32px; }
+      .topbar { padding-bottom: 16px; }
+      .term-tag { font-size: 11px; }
+      .intro { padding: 24px 0 19px; }
+      .intro-copy { font-size: 14px; line-height: 1.45; }
+      .stage, .schedule { padding: 17px; }
+      .die-area { min-height: 225px; }
+      .die { width: 82%; min-height: 145px; }
+      .button-row .button { flex: 1 1 calc(50% - 9px); }
+      .days-grid { min-height: 300px; gap: 7px; }
+      .day-title { padding: 10px 9px; }
+      .day-title h3 { font-size: 15px; }
+      .day-meta { padding-left: 8px; font-size: 10px; }
+      .assignment-list { padding-right: 6px; padding-left: 6px; }
+      .assignment { gap: 6px; padding: 6px; font-size: 12px; }
+      .entry-panel, .sequence-panel { padding: 17px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">P</span><span>Presentation Draw</span></div>
+      <div class="term-tag">Fall 2026</div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">Presentation schedule</p>
+        <h1 id="page-title">Presentation Draw</h1>
+        <p class="intro-copy">One roll, one group. Let’s find out who presents when.</p>
+        <div class="stats" aria-label="Draw statistics">
+          <div class="stat"><strong id="total-count">0</strong><span>groups total</span></div>
+          <div class="stat"><strong id="remaining-count">0</strong><span>remaining</span></div>
+          <div class="stat"><strong id="draw-state">Not started</strong><span>draw status</span></div>
+        </div>
+      </section>
+
+      <section class="main-grid" aria-label="Group draw and presentation schedule">
+        <section class="stage" aria-labelledby="draw-heading">
+          <div class="section-heading">
+            <h2 id="draw-heading">The draw</h2>
+            <span class="live-badge" id="stage-badge">Ready</span>
+          </div>
+          <div class="die-area" aria-live="polite" aria-atomic="true">
+            <div class="die" id="die">
+              <span class="die-face" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="die-label" id="die-label">Ready to roll</span>
+              <span class="die-hint" id="die-hint">Enter your groups to begin</span>
+            </div>
+          </div>
+          <div class="availability">
+            <span class="availability-label">Still in the draw</span>
+            <div class="chips" id="remaining-groups"><span class="empty-note">Your groups will appear here</span></div>
+          </div>
+          <div class="button-row" aria-label="Draw controls">
+            <button class="button button-primary" id="roll-button" type="button" disabled><span class="button-icon" aria-hidden="true">⚄</span>Roll</button>
+            <button class="button button-secondary" id="undo-button" type="button" disabled><span class="button-icon" aria-hidden="true">↶</span>Undo Last Roll</button>
+            <button class="button button-danger" id="reset-button" type="button"><span class="button-icon" aria-hidden="true">↻</span>Reset Draw</button>
+          </div>
+          <p class="status" id="status-message" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="schedule" aria-labelledby="schedule-heading">
+          <div class="schedule-head">
+            <div><h2 id="schedule-heading">Presentation days</h2><p>Groups are ordered by draw.</p></div>
+          </div>
+          <div class="days-grid">
+            <section class="day-column" aria-labelledby="thursday-heading">
+              <div class="day-title"><span class="weekday">Thursday</span><h3 id="thursday-heading">November 26</h3></div>
+              <div class="day-meta" id="thursday-meta">0 assigned</div>
+              <ol class="assignment-list" id="thursday-list" aria-label="Thursday presentation order"></ol>
+            </section>
+            <section class="day-column" aria-labelledby="tuesday-heading">
+              <div class="day-title"><span class="weekday">Tuesday</span><h3 id="tuesday-heading">December 1</h3></div>
+              <div class="day-meta" id="tuesday-meta">0 assigned</div>
+              <ol class="assignment-list" id="tuesday-list" aria-label="Tuesday presentation order"></ol>
+              <p class="full-note" id="thursday-full" hidden>Thursday is full. New rolls go to Tuesday.</p>
+            </section>
+          </div>
+        </section>
+      </section>
+
+      <section class="below-grid" aria-label="Group count and draw results">
+        <section class="entry-panel" aria-labelledby="entry-heading">
+          <h2 id="entry-heading">Number of groups</h2>
+          <p>Enter how many groups are presenting. The draw will create Group 1 through Group N.</p>
+          <label for="group-count">Total groups</label>
+          <input class="count-input" id="group-count" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 8" required>
+          <div class="start-row">
+            <button class="button button-primary" id="start-button" type="button"><span class="button-icon" aria-hidden="true">▶</span>Start Draw</button>
+            <p class="fairness">Each group is randomly selected once and removed from subsequent rolls.</p>
+          </div>
+          <div class="timestamps" id="timestamps" aria-live="polite"></div>
+          <div class="celebration" id="celebration" role="status">All groups are assigned. Good luck with your presentations!</div>
+        </section>
+
+        <section class="sequence-panel" aria-labelledby="sequence-heading">
+          <div class="section-heading">
+            <h2 id="sequence-heading">Overall draw sequence</h2>
+            <div class="button-row" style="margin:0">
+              <button class="button button-secondary" id="copy-button" type="button" disabled><span class="button-icon" aria-hidden="true">▣</span>Copy Results</button>
+              <button class="button button-secondary" id="download-button" type="button" disabled><span class="button-icon" aria-hidden="true">↓</span>Download Results</button>
+            </div>
+          </div>
+          <p>Every selection, in the order it was drawn.</p>
+          <ol class="sequence-list" id="sequence-list"></ol>
+          <div class="sequence-empty" id="sequence-empty">Results will appear here as groups are drawn.</div>
+        </section>
+      </section>
+    </main>
+  </div>
+  <div id="confetti-layer" aria-hidden="true"></div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const STORAGE_KEY = "presentation-draw-v1";
+      const ROLL_DURATION = 2000;
+      const nodes = {
+        groupInput: document.getElementById("group-count"),
+        startButton: document.getElementById("start-button"),
+        rollButton: document.getElementById("roll-button"),
+        undoButton: document.getElementById("undo-button"),
+        resetButton: document.getElementById("reset-button"),
+        copyButton: document.getElementById("copy-button"),
+        downloadButton: document.getElementById("download-button"),
+        die: document.getElementById("die"),
+        dieLabel: document.getElementById("die-label"),
+        dieHint: document.getElementById("die-hint"),
+        remainingGroups: document.getElementById("remaining-groups"),
+        totalCount: document.getElementById("total-count"),
+        remainingCount: document.getElementById("remaining-count"),
+        drawState: document.getElementById("draw-state"),
+        stageBadge: document.getElementById("stage-badge"),
+        status: document.getElementById("status-message"),
+        thursdayList: document.getElementById("thursday-list"),
+        tuesdayList: document.getElementById("tuesday-list"),
+        thursdayMeta: document.getElementById("thursday-meta"),
+        tuesdayMeta: document.getElementById("tuesday-meta"),
+        thursdayFull: document.getElementById("thursday-full"),
+        sequenceList: document.getElementById("sequence-list"),
+        sequenceEmpty: document.getElementById("sequence-empty"),
+        timestamps: document.getElementById("timestamps"),
+        celebration: document.getElementById("celebration"),
+        confettiLayer: document.getElementById("confetti-layer")
+      };
+
+      let state = {
+        groups: [],
+        remaining: [],
+        sequence: [],
+        startedAt: null,
+        completedAt: null
+      };
+      let rolling = false;
+      let rollTimer = null;
+      let animationFrame = null;
+      let confettiShown = false;
+      let audioContext = null;
+
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (error) {
+          setStatus("This browser could not save the draw. Keep this page open to preserve your results.", true);
+        }
+      }
+
+      function loadState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+          if (!saved || !Array.isArray(saved.groups) || !Array.isArray(saved.sequence)) return;
+          const validGroups = saved.groups.every((group) => typeof group === "string" && group.trim());
+          const validSequence = saved.sequence.every((group) => saved.groups.includes(group));
+          if (!validGroups || !validSequence || new Set(saved.groups.map((group) => group.toLocaleLowerCase())).size !== saved.groups.length) return;
+          const sequence = saved.sequence.filter((group, index, list) => list.indexOf(group) === index);
+          const drawn = new Set(sequence);
+          state = {
+            groups: saved.groups,
+            sequence,
+            remaining: saved.groups.filter((group) => !drawn.has(group)),
+            startedAt: saved.startedAt || null,
+            completedAt: sequence.length === saved.groups.length ? (saved.completedAt || null) : null
+          };
+          nodes.groupInput.value = String(state.groups.length);
+        } catch (error) {
+          state = { groups: [], remaining: [], sequence: [], startedAt: null, completedAt: null };
+        }
+      }
+
+      function setStatus(message, isError = false) {
+        nodes.status.textContent = message;
+        if (isError) nodes.status.setAttribute("role", "alert");
+        else nodes.status.setAttribute("role", "status");
+      }
+
+      function formatDate(value) {
+        return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+      }
+
+      function dayCapacity() {
+        return Math.ceil(state.groups.length / 2);
+      }
+
+      function getAssignments() {
+        const capacity = dayCapacity();
+        return {
+          thursday: state.sequence.slice(0, capacity),
+          tuesday: state.sequence.slice(capacity)
+        };
+      }
+
+      function renderList(listNode, groups) {
+        listNode.replaceChildren(...groups.map((group, index) => {
+          const item = document.createElement("li");
+          item.className = "assignment";
+          const order = document.createElement("span");
+          order.className = "order";
+          order.textContent = String(index + 1);
+          const name = document.createElement("span");
+          name.textContent = group;
+          item.append(order, name);
+          return item;
+        }));
+      }
+
+      function render() {
+        const active = state.groups.length > 0;
+        const complete = active && state.sequence.length === state.groups.length;
+        const assignments = getAssignments();
+        const capacity = dayCapacity();
+        nodes.totalCount.textContent = String(state.groups.length);
+        nodes.remainingCount.textContent = String(state.remaining.length);
+        nodes.drawState.textContent = !active ? "Not started" : complete ? "Complete" : "In progress";
+        nodes.stageBadge.textContent = rolling ? "Rolling" : complete ? "Complete" : active ? "Your turn" : "Ready";
+        nodes.groupInput.disabled = active;
+        nodes.startButton.disabled = active;
+        nodes.rollButton.disabled = !active || complete || rolling;
+        nodes.undoButton.disabled = !active || rolling || state.sequence.length === 0;
+        nodes.copyButton.disabled = !active || state.sequence.length === 0;
+        nodes.downloadButton.disabled = !active || state.sequence.length === 0;
+        nodes.die.classList.toggle("is-rolling", rolling);
+        nodes.dieHint.textContent = rolling ? "Choosing from the remaining groups" : complete ? "The draw is complete" : active ? (state.remaining.length ? `${state.remaining.length} group${state.remaining.length === 1 ? "" : "s"} still in the draw` : "No groups remaining") : "Enter your groups to begin";
+
+        nodes.remainingGroups.replaceChildren();
+        if (state.remaining.length) {
+          for (const group of state.remaining) {
+            const chip = document.createElement("span");
+            chip.className = "chip";
+            chip.textContent = group;
+            nodes.remainingGroups.append(chip);
+          }
+        } else {
+          const empty = document.createElement("span");
+          empty.className = "empty-note";
+          empty.textContent = active ? "All groups have been selected" : "Your groups will appear here";
+          nodes.remainingGroups.append(empty);
+        }
+
+        renderList(nodes.thursdayList, assignments.thursday);
+        renderList(nodes.tuesdayList, assignments.tuesday);
+        nodes.thursdayMeta.textContent = `${assignments.thursday.length} of ${active ? capacity : 0} assigned`;
+        nodes.tuesdayMeta.textContent = `${assignments.tuesday.length} assigned`;
+        nodes.thursdayFull.hidden = !active || assignments.thursday.length < capacity;
+
+        nodes.sequenceList.replaceChildren(...state.sequence.map((group, index) => {
+          const item = document.createElement("li");
+          item.className = "sequence-item";
+          const order = document.createElement("span");
+          order.className = "order";
+          order.textContent = String(index + 1);
+          const name = document.createElement("span");
+          name.textContent = group;
+          item.append(order, name);
+          return item;
+        }));
+        nodes.sequenceEmpty.hidden = state.sequence.length > 0;
+
+        const timeParts = [];
+        if (state.startedAt) timeParts.push(`<strong>Draw started:</strong> ${escapeHtml(formatDate(state.startedAt))}`);
+        if (state.completedAt) timeParts.push(`<strong>Draw completed:</strong> ${escapeHtml(formatDate(state.completedAt))}`);
+        nodes.timestamps.innerHTML = timeParts.join("<br>");
+        nodes.celebration.classList.toggle("visible", complete);
+
+        if (!active) {
+          nodes.dieLabel.textContent = "Ready to roll";
+          nodes.dieHint.textContent = "Enter your groups to begin";
+        } else if (!rolling && state.sequence.length === 0) {
+          nodes.dieLabel.textContent = "Let’s begin";
+        }
+        if (complete && !confettiShown) {
+          confettiShown = true;
+          launchConfetti();
+        }
+        if (!complete) confettiShown = false;
+      }
+
+      function escapeHtml(value) {
+        return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]);
+      }
+
+      function beginDraw() {
+        const groupCount = Number(nodes.groupInput.value);
+        if (!Number.isSafeInteger(groupCount) || groupCount < 1) {
+          setStatus("Enter a whole number of groups greater than zero.", true);
+          nodes.groupInput.focus();
+          return;
+        }
+        const groups = Array.from({ length: groupCount }, (_, index) => `Group ${index + 1}`);
+        state = { groups, remaining: [...groups], sequence: [], startedAt: new Date().toISOString(), completedAt: null };
+        confettiShown = false;
+        saveState();
+        render();
+        setStatus(`${groups.length} group${groups.length === 1 ? "" : "s"} locked in. The draw is ready.`);
+      }
+
+      function pickRandomGroup() {
+        const index = Math.floor(Math.random() * state.remaining.length);
+        return state.remaining[index];
+      }
+
+      function playRollSound() {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+
+        try {
+          if (!audioContext) audioContext = new AudioContextClass();
+          if (audioContext.state === "suspended") audioContext.resume();
+
+          const sampleRate = audioContext.sampleRate;
+          const noiseBuffer = audioContext.createBuffer(1, Math.ceil(sampleRate * 0.055), sampleRate);
+          const noise = noiseBuffer.getChannelData(0);
+          for (let index = 0; index < noise.length; index += 1) noise[index] = Math.random() * 2 - 1;
+
+          const startTime = audioContext.currentTime;
+          let offset = 0;
+          while (offset < ROLL_DURATION / 1000) {
+            const startAt = startTime + offset;
+            const source = audioContext.createBufferSource();
+            const filter = audioContext.createBiquadFilter();
+            const volume = audioContext.createGain();
+            source.buffer = noiseBuffer;
+            filter.type = "bandpass";
+            filter.frequency.value = 1200 + Math.random() * 1600;
+            filter.Q.value = 1.1;
+            volume.gain.setValueAtTime(0.001, startAt);
+            volume.gain.linearRampToValueAtTime(0.075 + Math.random() * 0.06, startAt + 0.004);
+            volume.gain.exponentialRampToValueAtTime(0.001, startAt + 0.045);
+            source.connect(filter);
+            filter.connect(volume);
+            volume.connect(audioContext.destination);
+            source.start(startAt);
+            source.stop(startAt + 0.055);
+            offset += 0.065 + Math.random() * 0.045;
+          }
+        } catch {}
+      }
+
+      function roll() {
+        if (rolling || state.remaining.length === 0) return;
+        rolling = true;
+        playRollSound();
+        setStatus("Rolling. The next group is being selected.");
+        render();
+        let lastGroup = "";
+        const cycle = () => {
+          if (!rolling || state.remaining.length === 0) return;
+          const candidate = pickRandomGroup();
+          lastGroup = candidate;
+          nodes.dieLabel.textContent = candidate;
+          animationFrame = window.setTimeout(cycle, 75);
+        };
+        cycle();
+        rollTimer = window.setTimeout(() => {
+          window.clearTimeout(animationFrame);
+          const selected = pickRandomGroup();
+          if (lastGroup === selected && state.remaining.length > 1) {
+            const alternate = state.remaining.find((group) => group !== selected);
+            nodes.dieLabel.textContent = alternate;
+          }
+          nodes.dieLabel.textContent = selected;
+          state.remaining = state.remaining.filter((group) => group !== selected);
+          state.sequence.push(selected);
+          if (state.remaining.length === 0) state.completedAt = new Date().toISOString();
+          rolling = false;
+          rollTimer = null;
+          animationFrame = null;
+          saveState();
+          render();
+          const assignedDay = state.sequence.length <= dayCapacity() ? "Thursday, November 26" : "Tuesday, December 1";
+          setStatus(`${selected} is assigned to ${assignedDay}.`);
+        }, ROLL_DURATION);
+      }
+
+      function undoLastRoll() {
+        if (rolling || state.sequence.length === 0) return;
+        const group = state.sequence.pop();
+        state.remaining.push(group);
+        state.completedAt = null;
+        confettiShown = false;
+        saveState();
+        render();
+        nodes.dieLabel.textContent = group;
+        setStatus(`${group} returned to the draw.`);
+      }
+
+      function resetDraw() {
+        if (!window.confirm("Reset the draw and delete all saved results? This cannot be undone.")) return;
+        if (rollTimer !== null) window.clearTimeout(rollTimer);
+        if (animationFrame !== null) window.clearTimeout(animationFrame);
+        rolling = false;
+        state = { groups: [], remaining: [], sequence: [], startedAt: null, completedAt: null };
+        confettiShown = false;
+        localStorage.removeItem(STORAGE_KEY);
+        nodes.groupInput.value = "";
+        nodes.dieLabel.textContent = "Ready to roll";
+        setStatus("Draw reset. Enter a new group list when you are ready.");
+        render();
+        nodes.groupInput.focus();
+      }
+
+      function buildResults() {
+        const assignments = getAssignments();
+        const lines = [
+          "Presentation Draw",
+          `Draw started: ${state.startedAt ? formatDate(state.startedAt) : "Not started"}`,
+          `Draw completed: ${state.completedAt ? formatDate(state.completedAt) : "In progress"}`,
+          "",
+          "Thursday, November 26, 2026"
+        ];
+        assignments.thursday.forEach((group, index) => lines.push(`${index + 1}. ${group}`));
+        lines.push("", "Tuesday, December 1, 2026");
+        assignments.tuesday.forEach((group, index) => lines.push(`${index + 1}. ${group}`));
+        lines.push("", "Overall draw sequence");
+        state.sequence.forEach((group, index) => lines.push(`${index + 1}. ${group}`));
+        return lines.join("\n");
+      }
+
+      async function copyResults() {
+        const text = buildResults();
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            const temporary = document.createElement("textarea");
+            temporary.value = text;
+            temporary.setAttribute("readonly", "");
+            temporary.style.position = "fixed";
+            temporary.style.opacity = "0";
+            document.body.append(temporary);
+            temporary.select();
+            const copied = document.execCommand("copy");
+            temporary.remove();
+            if (!copied) throw new Error("Clipboard unavailable");
+          }
+          setStatus("Results copied to the clipboard.");
+        } catch (error) {
+          setStatus("Could not copy results. Try downloading the text file instead.", true);
+        }
+      }
+
+      function downloadResults() {
+        const file = new Blob([buildResults()], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(file);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "bsad-281-presentation-results.txt";
+        document.body.append(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        setStatus("Results downloaded as a text file.");
+      }
+
+      function launchConfetti() {
+        const colors = ["#196b55", "#c9513d", "#f3c856", "#4b91a1", "#e58a42"];
+        nodes.confettiLayer.replaceChildren();
+        for (let index = 0; index < 70; index += 1) {
+          const piece = document.createElement("span");
+          piece.className = "confetti";
+          piece.style.left = `${Math.random() * 100}vw`;
+          piece.style.backgroundColor = colors[index % colors.length];
+          piece.style.setProperty("--drift", `${Math.random() * 220 - 110}px`);
+          piece.style.animationDelay = `${Math.random() * .8}s`;
+          nodes.confettiLayer.append(piece);
+        }
+        window.setTimeout(() => nodes.confettiLayer.replaceChildren(), 3600);
+      }
+
+      nodes.startButton.addEventListener("click", beginDraw);
+      nodes.rollButton.addEventListener("click", roll);
+      nodes.undoButton.addEventListener("click", undoLastRoll);
+      nodes.resetButton.addEventListener("click", resetDraw);
+      nodes.copyButton.addEventListener("click", copyResults);
+      nodes.downloadButton.addEventListener("click", downloadResults);
+
+      loadState();
+      render();
+      if (state.groups.length) setStatus("Saved draw restored from this browser.");
+    })();
+  </script>
+</body>
+</html>
